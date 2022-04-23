@@ -42,22 +42,24 @@ void ChessGame::on_turn_begin_no_history() {
   all_possible_moves = state.board.calculate_legal_moves(state.player_turn);
   king_under_attack = state.board.is_king_under_attack(state.player_turn);
 
-  const auto game_over = chess_views.game_over;
+  const auto game_over = [&](const std::string& reason) {
+    chess_views.game_over->set_text(reason);
+    view_manager.set_view(chess_views.game_over);
+  };
 
   if (all_possible_moves.empty()) {
     if (king_under_attack) {
       const auto winner =
         chess::other_color(state.player_turn) == chess::Color::White ? "White" : "Black";
 
-      game_over->set_text("Checkmate! " + std::string(winner) + " wins!");
+      game_over("Checkmate! " + std::string(winner) + " wins!");
     } else {
-      game_over->set_text("Draw via stalemate");
+      game_over("Draw via stalemate");
     }
-
-    view_manager.set_view(game_over);
   } else if (state.board.is_material_insufficient()) {
-    game_over->set_text("Draw via insufficient material");
-    view_manager.set_view(game_over);
+    game_over("Draw via insufficient material");
+  } else if (state.board.get_moves_since_capture_or_pawn_move() >= 50) {
+    game_over("Draw via 50 move rule");
   } else {
     const auto player = state.player_turn == chess::Color::White ? "white" : "black";
     const auto title = "Chess [" + std::string(player) + " are playing]";

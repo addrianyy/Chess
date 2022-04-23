@@ -1,9 +1,5 @@
 #include "game/Run.hpp"
 
-#ifdef _WIN32
-#define USE_WINMAIN
-#endif
-
 #ifdef USE_WINMAIN
 
 #include <Windows.h>

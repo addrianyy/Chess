@@ -1,7 +1,9 @@
 #include "Board.hpp"
 
 #include <algorithm>
+#include <cctype>
 #include <optional>
+#include <string>
 
 using namespace chess;
 
@@ -18,12 +20,12 @@ Color chess::other_color(Color color) {
   }
 }
 
-static std::optional<Position> find_king(const Board& board, Color color) {
+static std::optional<Position> find_piece(const Board& board, Color color, Piece piece) {
   for (int y = 0; y < 8; ++y) {
     for (int x = 0; x < 8; ++x) {
       const auto field = board.get_field(x, y);
 
-      if (field.piece == Piece::King && field.color == color) {
+      if (field.piece == piece && field.color == color) {
         return Position(x, y);
       }
     }
@@ -247,6 +249,16 @@ void Board::make_move(const Move& move, Piece promotion) {
   const auto from_field = get_field(move.from);
   const auto to_field = get_field(move.to);
 
+  if (from_field.piece == Piece::Pawn || move.captures) {
+    half_move_counter = 0;
+  } else {
+    half_move_counter++;
+  }
+
+  if (from_field.color == Color::Black) {
+    full_move_number++;
+  }
+
   // Move piece from `from` to `to`. Promote it if needed.
   set_field(move.from, Field{});
   set_field(move.to, Field{from_field.color, move.promotes ? promotion : from_field.piece, true});
@@ -315,7 +327,7 @@ std::vector<Move> Board::calculate_moves_without_castling(Color player_turn) con
 std::vector<Move> Board::calculate_moves_with_castling(Color player_turn) const {
   auto moves = calculate_moves_without_castling(player_turn);
 
-  const auto king_opt = find_king(*this, player_turn);
+  const auto king_opt = find_piece(*this, player_turn, Piece::King);
   if (!king_opt) {
     return moves;
   }
@@ -472,4 +484,118 @@ bool Board::is_material_insufficient() const {
   }
 
   return false;
+}
+
+std::string Board::get_fen_string(Color player_turn) const {
+  std::string result;
+
+  const auto piece_to_char = [&](Color color, Piece piece) -> char {
+    char c = ' ';
+
+    switch (piece) {
+    case Piece::Pawn:
+      c = 'p';
+      break;
+    case Piece::Bishop:
+      c = 'b';
+      break;
+    case Piece::Knight:
+      c = 'n';
+      break;
+    case Piece::Rook:
+      c = 'r';
+      break;
+    case Piece::Queen:
+      c = 'q';
+      break;
+    case Piece::King:
+      c = 'k';
+      break;
+    default:
+      break;
+    }
+
+    return color == Color::White ? char(std::toupper(c)) : c;
+  };
+
+  // Pieces placement.
+  for (int y = 7; y >= 0; --y) {
+    for (int x = 0; x < 8; ++x) {
+      const auto field = get_field(x, y);
+      if (field.is_solid_piece()) {
+        result += piece_to_char(field.color, field.piece);
+      } else {
+        int count = 1;
+
+        while (true) {
+          const int nx = x + 1;
+          if (nx >= 8 || get_field(nx, y).is_solid_piece()) {
+            break;
+          }
+
+          count++;
+          x++;
+        }
+
+        result += std::to_string(count);
+      }
+    }
+
+    if (y != 0) {
+      result += "/";
+    }
+  }
+
+  // Player turn.
+  result += player_turn == Color::White ? " w " : " b ";
+
+  // Castling rights.
+  bool any_castling_rights = false;
+  for (const auto color : {Color::White, Color::Black}) {
+    const auto y = color == Color::White ? 0 : 7;
+    const auto king = get_field(4, y);
+    if (king.piece != Piece::King || king.moved) {
+      continue;
+    }
+
+    const auto king_side = get_field(7, y);
+    const auto queen_side = get_field(0, y);
+
+    if (king_side.piece == Piece::Rook && !king_side.moved) {
+      result += piece_to_char(color, Piece::King);
+      any_castling_rights = true;
+    }
+
+    if (queen_side.piece == Piece::Rook && !queen_side.moved) {
+      result += piece_to_char(color, Piece::Queen);
+      any_castling_rights = true;
+    }
+  }
+
+  if (any_castling_rights) {
+    result += ' ';
+  } else {
+    result += "- ";
+  }
+
+  // En passant.
+  bool en_passant_available = false;
+  if (pawn_ghosts > 0) {
+    if (const auto ghost = find_piece(*this, other_color(player_turn), Piece::PawnGhost)) {
+      const char chars[] = "abcdefgh";
+      result += chars[ghost->x];
+      result += std::to_string(int(ghost->y) + 1);
+      en_passant_available = true;
+    }
+  }
+
+  if (en_passant_available) {
+    result += ' ';
+  } else {
+    result += "- ";
+  }
+
+  result += std::to_string(half_move_counter) + " " + std::to_string(full_move_number);
+
+  return result;
 }

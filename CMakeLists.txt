@@ -14,8 +14,11 @@ add_library(ChessLib src/game/ChessGame.cpp src/game/ChessGame.hpp src/chess/Boa
 target_include_directories(ChessLib PRIVATE src)
 target_link_libraries(ChessLib sfml-system sfml-window sfml-graphics)
 
-if (WIN32)
+set(NO_WINDOW TRUE)
+
+if (WIN32 AND NO_WINDOW)
     add_executable(Chess WIN32 src/main.cpp)
+    target_compile_definitions(Chess PRIVATE USE_WINMAIN)
 else ()
     add_executable(Chess src/main.cpp)
 endif ()

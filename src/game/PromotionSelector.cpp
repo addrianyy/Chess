@@ -9,7 +9,7 @@ void PromotionSelector::update_cursor_position(int x, int y) {
   }
 
   int fx, fy;
-  if (utils::map_coordinates(x, y, padding_x, padding_y, piece_size, 4, 1, fx, fy)) {
+  if (utils::map_coordinates(x, y, padding_x, padding_y, piece_size, pieces_count, 1, fx, fy)) {
     hovered_piece = fx;
   }
 }
@@ -18,9 +18,9 @@ void PromotionSelector::on_resize_event(int width, int height) {
   screen_width = width;
   screen_height = height;
 
-  piece_size = std::min(width / 6, 350);
+  piece_size = std::min(width / (pieces_count + 2), 350);
   padding_y = (height - piece_size) / 2;
-  padding_x = (width - piece_size * int(std::size(available_pieces))) / 2;
+  padding_x = (width - piece_size * pieces_count) / 2;
 
   size_token = piece_renderer.get_screen_size_token(piece_size);
 }

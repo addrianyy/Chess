@@ -18,8 +18,10 @@ class PromotionSelector : public ChessView {
   std::optional<chess::Piece> selected_piece;
   chess::Color piece_color = chess::Color::White;
 
-  constexpr static chess::Piece available_pieces[4] = {chess::Piece::Queen, chess::Piece::Knight,
-                                                       chess::Piece::Rook, chess::Piece::Bishop};
+  constexpr static chess::Piece available_pieces[] = {chess::Piece::Queen, chess::Piece::Knight,
+                                                      chess::Piece::Rook, chess::Piece::Bishop};
+
+  constexpr static auto pieces_count = int(std::size(available_pieces));
 
 public:
   using ChessView::ChessView;
