@@ -37,7 +37,6 @@ void Window::on_resize_event(int width, int height) {
 
 void Window::on_window_enter_event(bool entered) {
   focused = entered;
-  
   view_manager.get_view()->on_window_enter_event(entered);
 }
 

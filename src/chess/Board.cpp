@@ -307,6 +307,10 @@ void Board::make_move(const Move& move, Piece promotion) {
   }
 }
 
+void Board::make_move(const PlayerMove& player_move) {
+  make_move(player_move.move, player_move.promotion);
+}
+
 std::vector<Move> Board::calculate_moves_without_castling(Color player_turn) const {
   std::vector<Move> moves;
 

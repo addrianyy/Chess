@@ -2,11 +2,15 @@
 #include "ChessView.hpp"
 
 #include <chess/Board.hpp>
+#include <chess/BotIntegration.hpp>
+#include <core/MessageBox.hpp>
 
 #include <optional>
 #include <unordered_map>
 
 class ChessGame : public ChessView {
+  friend class WaitingForPlayerView;
+
   struct State {
     chess::Board board;
     chess::Color player_turn = chess::Color::White;
@@ -16,6 +20,7 @@ class ChessGame : public ChessView {
   struct History {
     std::vector<State> states;
     size_t current_index = 0;
+    bool present = false;
   };
 
   int screen_width = 1, screen_height = 1;
@@ -30,6 +35,7 @@ class ChessGame : public ChessView {
 
   std::optional<chess::Position> hovered_position;
   std::optional<chess::Position> moved_position;
+  std::optional<chess::Position> hidden_position;
 
   State state;
   History history;
@@ -41,12 +47,15 @@ class ChessGame : public ChessView {
 
   std::optional<chess::Move> pending_move;
 
+  std::unique_ptr<chess::BotIntegration> bot_integration;
+
   bool is_board_flipped();
+  bool is_bot_turn();
+  bool is_player_playing();
 
   void make_move(chess::Move move, chess::Piece promotion);
 
   void on_turn_begin();
-  void on_first_turn_begin();
   void on_turn_begin_no_history();
 
   void on_piece_grab(chess::Position position);
@@ -60,6 +69,8 @@ class ChessGame : public ChessView {
 
 public:
   ChessGame(Window& window, ChessViews& chess_views, PieceRenderer& piece_renderer);
+
+  void initialize();
 
   void update_cursor_position(int x, int y) override;
 

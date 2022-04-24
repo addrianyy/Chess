@@ -53,6 +53,11 @@ struct Move {
   bool castles : 1 = false;
 };
 
+struct PlayerMove {
+  Move move;
+  Piece promotion;
+};
+
 class Board {
   std::array<Field, 64> fields{};
 
@@ -80,6 +85,7 @@ public:
   bool is_material_insufficient() const;
 
   void make_move(const Move& move, Piece promotion);
+  void make_move(const PlayerMove& player_move);
 
   std::string get_fen_string(Color player_turn) const;
 

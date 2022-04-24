@@ -5,6 +5,7 @@
 #include "ChessGame.hpp"
 #include "GameOver.hpp"
 #include "PromotionSelector.hpp"
+#include "WaitingForPlayerView.hpp"
 
 #include "ChessViews.hpp"
 #include "Window.hpp"
@@ -34,8 +35,12 @@ void run() {
       vm.add_view(std::make_unique<GameOver>(game_window, chess_views, piece_renderer));
     chess_views.promotion_selector =
       vm.add_view(std::make_unique<PromotionSelector>(game_window, chess_views, piece_renderer));
+    chess_views.waiting_for_player =
+      vm.add_view(std::make_unique<WaitingForPlayerView>(game_window, chess_views, piece_renderer));
 
     vm.set_view(chess_views.chess_game);
+
+    chess_views.chess_game->initialize();
   }
 
   {

@@ -3,10 +3,21 @@
 #include "GameOver.hpp"
 #include "PromotionSelector.hpp"
 #include "Utils.hpp"
+#include "WaitingForPlayerView.hpp"
 
 #include <algorithm>
 
 bool ChessGame::is_board_flipped() { return false; }
+
+bool ChessGame::is_bot_turn() {
+  if (!bot_integration) {
+    return false;
+  }
+
+  return state.player_turn == chess::Color::Black;
+}
+
+bool ChessGame::is_player_playing() { return !is_bot_turn(); }
 
 void ChessGame::make_move(chess::Move move, chess::Piece promotion) {
   state.last_move = {move.from, move.to};
@@ -21,24 +32,32 @@ void ChessGame::make_move(chess::Move move, chess::Piece promotion) {
 }
 
 void ChessGame::on_turn_begin() {
-  // If it's not the last entry then shrink the history.
-  if (history.current_index + 1 != history.states.size()) {
-    history.states.resize(history.current_index + 1);
+  if (is_player_playing()) {
+    if (!history.present) {
+      history.states.push_back(state);
+      history.present = true;
+    } else {
+      // If it's not the last entry then shrink the history.
+      if (history.current_index + 1 != history.states.size()) {
+        history.states.resize(history.current_index + 1);
+      }
+
+      history.states.push_back(state);
+      history.current_index++;
+    }
   }
-
-  history.states.push_back(state);
-  history.current_index++;
-
-  on_turn_begin_no_history();
-}
-
-void ChessGame::on_first_turn_begin() {
-  history.states.push_back(state);
 
   on_turn_begin_no_history();
 }
 
 void ChessGame::on_turn_begin_no_history() {
+  if (view_manager.get_view() != this) {
+    view_manager.set_view(this);
+  }
+
+  pending_move = std::nullopt;
+  moved_position = std::nullopt;
+
   all_possible_moves = state.board.calculate_legal_moves(state.player_turn);
   king_under_attack = state.board.is_king_under_attack(state.player_turn);
 
@@ -64,6 +83,14 @@ void ChessGame::on_turn_begin_no_history() {
     const auto player = state.player_turn == chess::Color::White ? "white" : "black";
     const auto title = "Chess [" + std::string(player) + " are playing]";
     window.set_title(title);
+
+    if (is_bot_turn()) {
+      bot_integration->queue_best_move_calculation(state.board, state.player_turn);
+    }
+
+    if (!is_player_playing()) {
+      view_manager.set_view(chess_views.waiting_for_player);
+    }
   }
 }
 
@@ -125,9 +152,8 @@ void ChessGame::reset_game() {
 
   state = State{};
   history = History{};
-  pending_move = std::nullopt;
 
-  on_first_turn_begin();
+  on_turn_begin();
 }
 
 void ChessGame::draw_board() {
@@ -161,7 +187,7 @@ void ChessGame::draw_board() {
 
       renderer.fill_rect(rect, color);
 
-      if (!moving_this_piece) {
+      if (!moving_this_piece && position != hidden_position) {
         piece_renderer.draw_piece(field.color, field.piece, screen_x, screen_y, size_token);
       }
 
@@ -197,7 +223,14 @@ void ChessGame::draw_board() {
 }
 
 ChessGame::ChessGame(Window& window, ChessViews& chess_views, PieceRenderer& piece_renderer)
-    : ChessView(window, chess_views, piece_renderer) {
+    : ChessView(window, chess_views, piece_renderer) {}
+
+void ChessGame::initialize() {
+  bot_integration = chess::create_bot_integration();
+  if (!bot_integration) {
+    message_box("Warning", "No stockfish executable found, playing against bot is disabled.",
+                MessageIcon::Warning);
+  }
   reset_game();
 }
 
@@ -252,7 +285,7 @@ void ChessGame::on_window_enter_event(bool entered) {
 }
 
 void ChessGame::on_mouse_button_event(sf::Mouse::Button button, bool pressed, int x, int y) {
-  if (button != sf::Mouse::Left || !hovered_position) {
+  if (button != sf::Mouse::Left || !hovered_position || !is_player_playing()) {
     on_piece_return();
     return;
   }
@@ -280,11 +313,13 @@ void ChessGame::on_key_event(sf::Keyboard::Key key, bool pressed) {
     reset_game();
   }
 
-  if (key == sf::Keyboard::Left && history.current_index > 0) {
-    set_historical_state(history.current_index - 1);
-  }
-  if (key == sf::Keyboard::Right && history.current_index + 1 < history.states.size()) {
-    set_historical_state(history.current_index + 1);
+  if (is_player_playing()) {
+    if (key == sf::Keyboard::Left && history.current_index > 0) {
+      set_historical_state(history.current_index - 1);
+    }
+    if (key == sf::Keyboard::Right && history.current_index + 1 < history.states.size()) {
+      set_historical_state(history.current_index + 1);
+    }
   }
 }
 
@@ -293,7 +328,7 @@ void ChessGame::on_update() {
 
   if (moved_position) {
     playable_piece = true;
-  } else if (hovered_position) {
+  } else if (hovered_position && is_player_playing()) {
     const auto field = state.board.get_field(*hovered_position);
     playable_piece = field.is_solid_piece() && field.color == state.player_turn;
   }
@@ -321,5 +356,11 @@ void ChessGame::on_switched_view(View* before) {
       pending_move = std::nullopt;
       on_piece_return();
     }
+  }
+
+  if (before == chess_views.waiting_for_player &&
+      !chess_views.waiting_for_player->was_interrupted()) {
+    const auto player_move = *chess_views.waiting_for_player->get_player_move();
+    make_move(player_move.move, player_move.promotion);
   }
 }

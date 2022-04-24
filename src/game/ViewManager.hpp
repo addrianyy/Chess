@@ -9,6 +9,11 @@ class ViewManager {
   View* current_view = nullptr;
 
 public:
+  ViewManager() = default;
+
+  ViewManager(const ViewManager&) = delete;
+  ViewManager& operator=(const ViewManager&) = delete;
+
   template <typename T> T* add_view(std::unique_ptr<T> view) {
     const auto ptr = view.get();
     views.push_back(std::move(view));
